@@ -23,6 +23,8 @@ class intervalsProbability:
             raise Exception('Expecting a numpy array as argument')
         if np.size(subset)!=self.nbDecision:
             raise Exception('Subset incompatible with the frame size')
+        if self.isReachable()==0:
+            self.setReachableProbability()
         else:
             lowerProbability=max(np.sum(self.lproba[1,subset[:]==1]),1-np.sum(self.lproba[0,subset[:]==0]))
             return lowerProbability
@@ -32,6 +34,8 @@ class intervalsProbability:
             raise Exception('Expecting a numpy array as argument')
         if np.size(subset)!=self.nbDecision:
             raise Exception('Subset incompatible with the frame size')
+        if self.isReachable()==0:
+            self.setReachableProbability()
         else:
             upperProbability=min(np.sum(self.lproba[0,subset[:]==1]),1-np.sum(self.lproba[1,subset[:]==0]))
             return upperProbability
@@ -52,11 +56,13 @@ class intervalsProbability:
             for i in range(self.nbDecision):
                 subset=np.ones(self.nbDecision)
                 subset[i]=0
-                lb=max(lproba[1,i],1-self.getUpperProbability(subset))
-                ub=min(lproba[0,i],1-self.getLowerProbability(subset))
+                lb=max(self.lproba[1,i],1-np.sum(self.lproba[0,subset[:]==1]))
+                ub=min(self.lproba[0,i],1-np.sum(self.lproba[1,subset[:]==1]))
                 lreachableProba[1,i]=lb
                 lreachableProba[0,i]=ub
             self.lproba[:]=lreachableProba[:]
+        else:
+            raise Exception('intervals inducing empty set: operation not possible')
 
     def printProbability(self):
         str1,str2="upper bound |","lower bound |"
