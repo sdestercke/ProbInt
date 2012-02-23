@@ -1,7 +1,12 @@
 import numpy as np
 
 class intervalsProbability:
+    """Intervalprobability class
 
+    Argument:
+    lproba -- a 2xn array containing upper (1st row) and lower (2nd row) bounds
+    
+    """
     def __init__(self,lproba):
         if lproba.__class__.__name__!='ndarray':
             raise Exception('Expecting a numpy array as argument')
@@ -13,12 +18,25 @@ class intervalsProbability:
             raise Exception('Some upper bounds lower than lower bounds')
 
     def isProper(self):
+        """Check if probability intervals induce a non-empty probability set. 
+        
+        Return 0 (empty) or 1 (non-empty).
+        
+        """
         if np.sum(self.lproba[1,:])<=1 and np.sum(self.lproba[0,:])>=1:
             return 1
         else:
             return 0
 
     def getLowerProbability(self,subset):
+        """Compute lower probability of an event expressed in binary code. 
+        
+        Argument:
+        subset -- a 1xn vector containing 1 for elements in the event, 0 otherwise.
+        
+        Return lower probability value.
+        
+        """
         if subset.__class__.__name__!='ndarray':
             raise Exception('Expecting a numpy array as argument')
         if np.size(subset)!=self.nbDecision:
@@ -86,5 +104,5 @@ if __name__=='__main__':
     print essai.getUpperProbability(np.array([1,1,1]))
     essai.printProbability()
     essai.setReachableProbability()
-    print essai.getUpperProbability([1,0,1])
+    print essai.getUpperProbability([1,0,1]) #should give an error.
     essai.printProbability()
