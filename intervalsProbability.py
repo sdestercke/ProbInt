@@ -1,10 +1,70 @@
 import numpy as np
 
+def getMaxCoherentIntervals(setOfInt):
+    """Find and return the maximal subsets of coherent intervals from a list of intervals 
+
+    Argument:
+    setOfInt -- a 2xn array containing upper (1st row) and lower (2nd row) bounds of intervals    
+    """
+    # separate and setting up indices of sorted interval bounds
+    upper=setOfInt[0,:]
+    lower=setOfInt[1,:]
+    indup=upper.argsort()
+    indlow=lower.argsort()
+    sortup=np.sort(upper)
+    sortlow=np.sort(lower)
+    # initializing variables for MCS detection
+    MCSlist=[]
+    currentMCS=[]
+    ind_up=0
+    ind_low=0 
+    for i in range(2*upper.size-1):
+        # deals with possible equality of next value
+        if sortup[ind_up] == sortlow[ind_low]:
+            currentMCS.append(indlow[ind_low])
+            ind_low=ind_low+1
+            # no more lower bounds encountered (reach end of upper)
+            if ind_low == upper.size-1:
+                print 'last lower bound reached, adding last MCS'
+                MCSlist.append(currentMCS[:])
+                print MCSlist
+                break
+            MCSlist.append(currentMCS[:])
+        # first case: the next value is a lower bound
+        elif sortlow[ind_low] < sortup[ind_up]:
+            currentMCS.append(indlow[ind_low])
+            print 'next value is lower bound, adding'
+            print indlow[ind_low]
+            print 'current MCS'
+            print currentMCS
+            ind_low=ind_low+1
+            # no more lower bounds encountered (reach end of upper)
+            if ind_low == upper.size-1:
+                print 'last lower bound reached, adding last MCS'
+                MCSlist.append(currentMCS[:])
+                print MCSlist
+                break
+            # case where a lower bound is followed by an upper bound
+            if min(sortlow[ind_low],sortup[ind_up]) < sortlow[ind_low]:
+                print 'next value gonna be upper bound'
+                print 'adding to List'
+                print currentMCS
+                MCSlist.append(currentMCS[:])
+                print MCSlist
+        # second case: the next value is an upper bound
+        else:
+            print 'removing element from MCS'
+            print indup[ind_up]
+            currentMCS.remove(indup[ind_up])
+            ind_up=ind_up+1
+    return MCSlist
+        
+
 class intervalsProbability:
     """Class of probability intervals: upper and lower prob. bounds on singletons
 
     Argument:
-    lproba -- a 2xn array containing upper (1st row) and lower (2nd row) bounds
+    lproba -- a 2xn array containing upper (1st row) and lower (2nd row) probabilistic bounds
     
     """
     
@@ -51,6 +111,14 @@ class intervalsProbability:
             return lowerProbability
 
     def getUpperProbability(self,subset):
+        """Compute upper probability of an event expressed in binary code. 
+        
+        Argument:
+        subset -- a 1xn vector containing 1 for elements in the event, 0 otherwise.
+        
+        Return upper probability value.
+        
+        """    
         if subset.__class__.__name__!='ndarray':
             raise Exception('Expecting a numpy array as argument')
         if subset.size != self.nbDecision:
@@ -121,7 +189,9 @@ class setOfIntProba:
         self.nbDecision=intlist[0,0].size
         
     def areCompatible(self):
-        """Check whether the set of probability intervals are compatible, i.e., if the conjunction is non-empty
+        """Check whether the set of probability intervals are compatible, i.e., if the conjunction is non-empty.
+        
+        Return 1 if non-empty, 0 if empty
         """
         min=self.intlist[:,1,:].max(axis=0)
         max=self.intlist[:,0,:].min(axis=0)
