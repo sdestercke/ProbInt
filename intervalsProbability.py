@@ -23,7 +23,7 @@ def getMaxCoherentIntervals(setOfInt):
         if sortup[ind_up] == sortlow[ind_low]:
             currentMCS.append(indlow[ind_low])
             ind_low=ind_low+1
-            # no more lower bounds encountered (reach end of upper)
+            # no more lower bounds encountered (reach end of lower)
             if ind_low == upper.size-1:
                 print 'last lower bound reached, adding last MCS'
                 MCSlist.append(currentMCS[:])
@@ -38,7 +38,7 @@ def getMaxCoherentIntervals(setOfInt):
             print 'current MCS'
             print currentMCS
             ind_low=ind_low+1
-            # no more lower bounds encountered (reach end of upper)
+            # no more lower bounds encountered (reach end of lower)
             if ind_low == upper.size-1:
                 print 'last lower bound reached, adding last MCS'
                 MCSlist.append(currentMCS[:])
@@ -130,6 +130,12 @@ class intervalsProbability:
             return upperProbability
 
     def isReachable(self):
+        """Check if the probability intervals are reachable (are coherent / correspond to tightest possible 
+        constraints) 
+        
+        Return a 0/1 value (1: are reachable).
+        
+        """    
         for i in range(self.nbDecision):
             subset=np.ones(self.nbDecision)
             subset[i]=0
@@ -140,6 +146,8 @@ class intervalsProbability:
         return 1
 
     def setReachableProbability(self):
+        """Make the bounds reachable and return them. 
+        """    
         if self.isProper()==1:
             lreachableProba=np.zeros((2,self.nbDecision))
             for i in range(self.nbDecision):
@@ -154,6 +162,8 @@ class intervalsProbability:
             raise Exception('intervals inducing empty set: operation not possible')
 
     def printProbability(self):
+        """Print the current bounds 
+        """  
         str1,str2="upper bound |","lower bound |"
         str3=" "*13;
         i=0
