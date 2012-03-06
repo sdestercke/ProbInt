@@ -25,7 +25,6 @@ def getMaxCoherentIntervals(setOfInt):
             ind_low=ind_low+1
             # no more lower bounds encountered (reach end of lower)
             if ind_low == upper.size-1:
-                print 'last lower bound reached, adding last MCS'
                 MCSlist.append(currentMCS[:])
                 print MCSlist
                 break
@@ -33,28 +32,15 @@ def getMaxCoherentIntervals(setOfInt):
         # first case: the next value is a lower bound
         elif sortlow[ind_low] < sortup[ind_up]:
             currentMCS.append(indlow[ind_low])
-            print 'next value is lower bound, adding'
-            print indlow[ind_low]
-            print 'current MCS'
-            print currentMCS
             ind_low=ind_low+1
             # no more lower bounds encountered (reach end of lower)
             if ind_low == upper.size-1:
-                print 'last lower bound reached, adding last MCS'
                 MCSlist.append(currentMCS[:])
-                print MCSlist
                 break
             # case where a lower bound is followed by an upper bound
             if min(sortlow[ind_low],sortup[ind_up]) < sortlow[ind_low]:
-                print 'next value gonna be upper bound'
-                print 'adding to List'
-                print currentMCS
-                MCSlist.append(currentMCS[:])
-                print MCSlist
         # second case: the next value is an upper bound
         else:
-            print 'removing element from MCS'
-            print indup[ind_up]
             currentMCS.remove(indup[ind_up])
             ind_up=ind_up+1
     return MCSlist
@@ -160,6 +146,14 @@ class intervalsProbability:
             self.lproba[:]=lreachableProba[:]
         else:
             raise Exception('intervals inducing empty set: operation not possible')
+            
+    def nc_maximin_decision(self):
+        """Return the maximin classification decision (nc: no costs)
+        """
+        
+    def nc_maximal_decision(self):
+        """Return the classification decisions that are maximal (nc: no costs)
+        """
 
     def printProbability(self):
         """Print the current bounds 
@@ -203,12 +197,15 @@ class setOfIntProba:
         
         Return 1 if non-empty, 0 if empty
         """
+        comp=1
         min=self.intlist[:,1,:].max(axis=0)
         max=self.intlist[:,0,:].min(axis=0)
-        if min.sum() <= 1 and max.sum() >= 1:
-            return 1
-        else:
-            return 0
+        if min.sum() > 1 or max.sum() < 1:
+            comp=0
+        for i in range(self.nbDecision):
+            if min[i] > max[i]:
+                comp=0
+        return comp
             
     def conjunction(self):
         """Perform a conjunctive merging of the set of probability intervals
@@ -240,7 +237,17 @@ class setOfIntProba:
             fusedproba[1,i]=lb
             fusedproba[0,i]=ub
         result=intervalsProbability(fusedproba)
-        return result        
+        return result
+        
+    def _getalmostMCS(self):
+        """Internal function to get almost MCS probInt, in order to fusion them.
+        
+        Return the set of 'almost' MCS at the end"""
+        
+    def almostMCScomb(self,listofMCS):
+        """get a list of 'almost' MCS and perform a combination according to it.
+        
+        Return a proper probability intervals"""
 
 if __name__=='__main__':
     lproba =np.array([[0.4,0.4,0.5],[0.2,0,0.2]])
