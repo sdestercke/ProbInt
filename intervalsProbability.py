@@ -24,9 +24,8 @@ def getMaxCoherentIntervals(setOfInt):
             currentMCS.append(indlow[ind_low])
             ind_low=ind_low+1
             # no more lower bounds encountered (reach end of lower)
-            if ind_low == upper.size-1:
+            if ind_low == upper.size:
                 MCSlist.append(currentMCS[:])
-                print MCSlist
                 break
             MCSlist.append(currentMCS[:])
         # first case: the next value is a lower bound
@@ -34,11 +33,12 @@ def getMaxCoherentIntervals(setOfInt):
             currentMCS.append(indlow[ind_low])
             ind_low=ind_low+1
             # no more lower bounds encountered (reach end of lower)
-            if ind_low == upper.size-1:
+            if ind_low == upper.size:
                 MCSlist.append(currentMCS[:])
                 break
             # case where a lower bound is followed by an upper bound
             if min(sortlow[ind_low],sortup[ind_up]) < sortlow[ind_low]:
+                MCSlist.append(currentMCS[:])
         # second case: the next value is an upper bound
         else:
             currentMCS.remove(indup[ind_up])
@@ -92,9 +92,8 @@ class intervalsProbability:
             raise Exception('Subset incompatible with the frame size')
         if self.isReachable()==0:
             self.setReachableProbability()
-        else:
-            lowerProbability=max(self.lproba[1,subset[:]==1].sum(),1-self.lproba[0,subset[:]==0].sum())
-            return lowerProbability
+        lowerProbability=max(self.lproba[1,subset[:]==1].sum(),1-self.lproba[0,subset[:]==0].sum())
+        return lowerProbability
 
     def getUpperProbability(self,subset):
         """Compute upper probability of an event expressed in binary code. 
@@ -111,9 +110,8 @@ class intervalsProbability:
             raise Exception('Subset incompatible with the frame size')
         if self.isReachable()==0:
             self.setReachableProbability()
-        else:
-            upperProbability=min(self.lproba[0,subset[:]==1].sum(),1-self.lproba[1,subset[:]==0].sum())
-            return upperProbability
+        upperProbability=min(self.lproba[0,subset[:]==1].sum(),1-self.lproba[1,subset[:]==0].sum())
+        return upperProbability
 
     def isReachable(self):
         """Check if the probability intervals are reachable (are coherent / correspond to tightest possible 
@@ -150,10 +148,23 @@ class intervalsProbability:
     def nc_maximin_decision(self):
         """Return the maximin classification decision (nc: no costs)
         """
+        if self.isReachable()==0:
+            self.setReachableProbability()
+        return self.lproba[1,:].argmax()
+        
+    def nc_maximax_decision(self):
+        """Return the maximax classification decision (nc: no costs)
+        """
+        if self.isReachable()==0:
+            self.setReachableProbability()
+        return self.lproba[0,:].argmax()
         
     def nc_maximal_decision(self):
         """Return the classification decisions that are maximal (nc: no costs)
         """
+        if self.isReachable()==0:
+            self.setReachableProbability()
+        return 0
 
     def printProbability(self):
         """Print the current bounds 
@@ -212,6 +223,8 @@ class setOfIntProba:
         
         Return a possibly non-proper intervalsProbability class object.
         """
+        if self.areCompatible() == 0:
+            raise Exception('Probability intervals not compatible, conjunction empty') 
         fusedproba=np.zeros((2,self.nbDecision))
         for i in range(self.nbDecision):
             subset=np.ones(self.nbDecision)
@@ -239,15 +252,59 @@ class setOfIntProba:
         result=intervalsProbability(fusedproba)
         return result
         
-    def _getalmostMCS(self):
+    def getalmostMCS(self):
         """Internal function to get almost MCS probInt, in order to fusion them.
         
         Return the set of 'almost' MCS at the end"""
+        #Initialize MCS as all probability intervals
+        listofMCS=[range(self.nbProbInt)]
+        for j in range(self.nbDecision):
+            temp_list=[]
+            print 'index %d of frame' % j
+            for i in range(len(listofMCS)):
+                test=setOfIntProba(self.intlist[listofMCS[i],:,:])
+                print 'test of compatibility %d' % test.areCompatible()
+                if test.areCompatible() == 1:
+                    temp_list.append(listofMCS[i][:])
+                else:
+                    print self.intlist[listofMCS[i][:],:,j].transpose()
+                    MCS=getMaxCoherentIntervals(self.intlist[listofMCS[i][:],:,j].transpose())
+                    print 'MCS is'
+                    print MCS
+                    for l in range(len(MCS)):
+                        sub_MCS=[]
+                        for k in MCS[l]:
+                            sub_MCS.append(listofMCS[i][k])
+                        print 'sub_MCS is'
+                        print sub_MCS
+                        temp_list.append(sub_MCS[:])
+            listofMCS=temp_list[:]
+        return listofMCS
+            
         
-    def almostMCScomb(self,listofMCS):
+    def almostMCScomb(self):
         """get a list of 'almost' MCS and perform a combination according to it.
         
         Return a proper probability intervals"""
+        
+    def mostMCSconj(self):
+        """get a list of 'almost' MCS and perform a conjunctive combination on the MCS
+        counting the most elements (in case of ties, first one is chosen)
+        
+        Return a proper probability intervals
+        """
+        
+    def discountnoncomp(self):
+        """return set of discounted probability intervals if they are not compatible
+        """
+        if self.areCompatible() == 0:
+            if min.sum() - 1 > 0:
+                epsilon_l=1./min.sum()
+            if max.sum() - 1 < 0:
+                epsilon_u=(1.-self.nbDecision)/(max.sum()-self.nbDecision)
+        discount=min(epsilon_l,epsilon_u)
+        self.intlist[:,1,:]=self.intlist[:,1,:]*discount
+        self.intlist[:,0,:]=self.intlist[:,0,:]*discount+(1-discount)
 
 if __name__=='__main__':
     lproba =np.array([[0.4,0.4,0.5],[0.2,0,0.2]])
@@ -256,12 +313,12 @@ if __name__=='__main__':
     print essai.getUpperProbability(np.array([1,1,1]))
     essai.printProbability()
     essai.setReachableProbability()
-    print essai.getUpperProbability(np.array[1,0,1])
+    print essai.getUpperProbability(np.array([1,0,1]))
     essai.printProbability()
     
-    setproba=np.array([[[0.6,0.4,0.5],[0.2,0.3,0.2]],[[0.7,0.3,0.6],[0.2,0.,0.2]],
-                    [[0.7,0.3,0.6],[0.2,0.,0.2]],[[0.6,0.4,0.5],[0.2,0.3,0.2]]])
-    test=Intprob.setOfIntProba(setproba)
+    setproba=np.array([[[0.6,0.5,0.2],[0.4,0.3,0.]],[[0.55,0.55,0.2],[0.35,0.35,0.]],
+                    [[0.5,0.2,0.6],[0.3,0.,0.4]],[[0.35,0.6,0.35],[0.15,0.4,0.15]]])
+    test=setOfIntProba(setproba)
     test.areCompatible()
     test.conjunction()
 
