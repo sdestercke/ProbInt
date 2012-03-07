@@ -164,6 +164,12 @@ class intervalsProbability:
         """
         if self.isReachable()==0:
             self.setReachableProbability()
+        maximality_classe=np.ones(nb_classes)
+        for i in range(nb_classes):
+            for j in range(nb_classes):
+                if i != j and maximality_classe[i] == 1 and maximality_classe[j] == 1:
+                    if -self.lproba[0,j]+self.lproba[1,i] > 0:
+                        maximality_classe[j]=0
         return 0
 
     def printProbability(self):
@@ -173,7 +179,7 @@ class intervalsProbability:
         str3=" "*13;
         i=0
         for interval in range(self.nbDecision):
-            str3+="   y%d "%i
+            str3+="   y%d " %i
             str1+=" %.3f" % self.lproba[0,interval]
             str2+=" %.3f" % self.lproba[1,interval]
             i+=1
@@ -260,25 +266,25 @@ class setOfIntProba:
         listofMCS=[range(self.nbProbInt)]
         for j in range(self.nbDecision):
             temp_list=[]
-            print 'index %d of frame' % j
             for i in range(len(listofMCS)):
                 test=setOfIntProba(self.intlist[listofMCS[i],:,:])
-                print 'test of compatibility %d' % test.areCompatible()
                 if test.areCompatible() == 1:
                     temp_list.append(listofMCS[i][:])
                 else:
-                    print self.intlist[listofMCS[i][:],:,j].transpose()
                     MCS=getMaxCoherentIntervals(self.intlist[listofMCS[i][:],:,j].transpose())
-                    print 'MCS is'
-                    print MCS
                     for l in range(len(MCS)):
                         sub_MCS=[]
                         for k in MCS[l]:
                             sub_MCS.append(listofMCS[i][k])
-                        print 'sub_MCS is'
-                        print sub_MCS
                         temp_list.append(sub_MCS[:])
             listofMCS=temp_list[:]
+        listofMCS=[]
+        # elmminating redundant MCS
+        for elt in temp_list:
+            try:
+                ind=listofMCS.index(elt)
+            except:
+                listofMCS.append(elt)
         return listofMCS
             
         
@@ -286,6 +292,20 @@ class setOfIntProba:
         """get a list of 'almost' MCS and perform a combination according to it.
         
         Return a proper probability intervals"""
+        list=self.getalmostMCS()
+        nbMCS=len(list)
+        conj=[]
+        setofdisj=[]
+        for i in range(nbMCS):
+            setofprob=setOfIntProba(self.intlist[list[i],:,:])
+            if setofprob.areCompatible() == 0:
+                setofprob.discountnoncomp
+            conj=setofprob.conjunction()
+            resconj=np.array([conj.lproba[0,:],conj.lproba[1,:]])
+            setofdisj.append(resconj)
+        setofprob2=setOfIntProba(np.array(setofdisj))
+        return setofprob2.disjunction()
+            
         
     def mostMCSconj(self):
         """get a list of 'almost' MCS and perform a conjunctive combination on the MCS
@@ -293,6 +313,16 @@ class setOfIntProba:
         
         Return a proper probability intervals
         """
+        list=self.getalmostMCS()
+        nbMCS=len(list)
+        nbsetinMCS=np.zeros(nbMCS)
+        for i in range(nbMCS):
+            nbsetinMCS[i]=len(list[i])
+        setofprob=setOfIntProba(self.intlist[list[nbsetinMCS.argmax()],:,:])
+        if setofprob.areCompatible() == 0:
+            setofprob.discountnoncomp
+        return setofprob.conjunction()
+        
         
     def discountnoncomp(self):
         """return set of discounted probability intervals if they are not compatible
@@ -320,5 +350,5 @@ if __name__=='__main__':
                     [[0.5,0.2,0.6],[0.3,0.,0.4]],[[0.35,0.6,0.35],[0.15,0.4,0.15]]])
     test=setOfIntProba(setproba)
     test.areCompatible()
-    test.conjunction()
+    test.getalmostMCS()
 
