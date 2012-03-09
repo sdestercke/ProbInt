@@ -1,4 +1,5 @@
 import numpy as np
+import Orange
 
 def getMaxCoherentIntervals(setOfInt):
     """Find and return the maximal subsets of coherent intervals from a list of intervals 
@@ -44,7 +45,54 @@ def getMaxCoherentIntervals(setOfInt):
             currentMCS.remove(indup[ind_up])
             ind_up=ind_up+1
     return MCSlist
-        
+    
+def test_forest(training,test):
+    """Function that takes a training and test data sets, build forests and return decisions
+    """
+    s=4
+    accuracy=0.
+    set_accuracy=0.
+    disc_accuracy=0.
+    prec=0.
+    nb_classes=len(test.domain.class_var.values)
+    tree_learn = Orange.classification.tree.TreeLearner(minExamples=2, mForPrunning=2, 
+                            sameMajorityPruning=True, name='tree')
+    forest = Orange.ensemble.forest.RandomForestLearner(trees=15, base_learner=tree_learn)
+    single_tree = tree_learn(training)
+    result = forest(training)
+    for j in range(len(test)):
+        setofprob=[]
+        for i in range(len(result.classifiers)):
+            low=np.zeros(nb_classes)
+            up=np.zeros(nb_classes)
+            answer=result.classifiers[i].descender(result.classifiers[i].tree,test[j])
+            divide=sum(answer[0].distribution)+s
+            for k in range(nb_classes):
+                low[k]=(answer[0].distribution[k])/divide
+                up[k]=(answer[0].distribution[k]+s)/divide
+            prob=np.array([up,low])
+            setofprob.append(prob[:])
+        resultingset=setOfIntProba(np.array(setofprob))
+        resultingcomb=resultingset.mostMCSconj()
+        decision=resultingcomb.nc_hurwicz_decision(0.5)        
+        if test[j].getclass()==test.domain.class_var.values[decision]:
+            accuracy=accuracy+1
+        decision_max=resultingcomb.nc_maximal_decision()  
+        true_class=np.zeros(nb_classes)
+        for k in range(nb_classes):
+            if test[j].getclass()==test.domain.class_var.values[k]:
+                true_class[k]=1
+        if any(np.minimum(decision_max,true_class)==1):
+            set_accuracy=set_accuracy+1
+            disc_accuracy=disc_accuracy+(1./decision_max.sum())
+    accuracy=accuracy/len(test)
+    set_accuracy=set_accuracy/len(test)
+    disc_accuracy=disc_accuracy/len(test)
+    for i in range(len(test)):
+        if single_tree(test[i])==test[i].getclass():
+            prec+=1.
+    prec=prec/len(test)
+    return accuracy, set_accuracy, disc_accuracy, prec
 
 class intervalsProbability:
     """Class of probability intervals: upper and lower prob. bounds on singletons
@@ -159,18 +207,26 @@ class intervalsProbability:
             self.setReachableProbability()
         return self.lproba[0,:].argmax()
         
+    def nc_hurwicz_decision(self,alpha):
+        """Return the maximax classification decision (nc: no costs)
+        """
+        if self.isReachable()==0:
+            self.setReachableProbability()
+        hurwicz=alpha*self.lproba[0,:]+(1-alpha)*self.lproba[1,:]
+        return hurwicz.argmax()
+        
     def nc_maximal_decision(self):
         """Return the classification decisions that are maximal (nc: no costs)
         """
         if self.isReachable()==0:
             self.setReachableProbability()
-        maximality_classe=np.ones(nb_classes)
-        for i in range(nb_classes):
-            for j in range(nb_classes):
+        maximality_classe=np.ones(self.nbDecision)
+        for i in range(self.nbDecision):
+            for j in range(self.nbDecision):
                 if i != j and maximality_classe[i] == 1 and maximality_classe[j] == 1:
                     if -self.lproba[0,j]+self.lproba[1,i] > 0:
                         maximality_classe[j]=0
-        return 0
+        return maximality_classe
 
     def printProbability(self):
         """Print the current bounds 
@@ -217,10 +273,10 @@ class setOfIntProba:
         comp=1
         min=self.intlist[:,1,:].max(axis=0)
         max=self.intlist[:,0,:].min(axis=0)
-        if min.sum() > 1 or max.sum() < 1:
+        if min.sum() >= 1 or max.sum() <= 1:
             comp=0
         for i in range(self.nbDecision):
-            if min[i] > max[i]:
+            if min[i] >= max[i]:
                 comp=0
         return comp
             
@@ -299,7 +355,7 @@ class setOfIntProba:
         for i in range(nbMCS):
             setofprob=setOfIntProba(self.intlist[list[i],:,:])
             if setofprob.areCompatible() == 0:
-                setofprob.discountnoncomp
+                setofprob.discountnoncomp()
             conj=setofprob.conjunction()
             resconj=np.array([conj.lproba[0,:],conj.lproba[1,:]])
             setofdisj.append(resconj)
@@ -320,19 +376,48 @@ class setOfIntProba:
             nbsetinMCS[i]=len(list[i])
         setofprob=setOfIntProba(self.intlist[list[nbsetinMCS.argmax()],:,:])
         if setofprob.areCompatible() == 0:
-            setofprob.discountnoncomp
+            setofprob.discountnoncomp()
         return setofprob.conjunction()
+        
+    def bestfirstMCS(self,nb):
+        """return the MCS that counts the n sets counting the most objects. 
+        """
+        list=self.getalmostMCS()
+        nbMCS=len(list)
+        nbsetinMCS=np.zeros(nbMCS)
+        setofdisj=[]
+        for i in range(nbMCS):
+            nbsetinMCS[i]=len(list[i])
+        best=np.argsort(nbsetinMCS)
+        if nb > nbMCS:
+            nb=nbMCS
+        for i in range(nb):
+            setofprob=setOfIntProba(self.intlist[list[best[i]],:,:])
+            if setofprob.areCompatible() == 0:
+                setofprob.discountnoncomp()
+            conj=setofprob.conjunction()
+            resconj=np.array([conj.lproba[0,:],conj.lproba[1,:]])
+            setofdisj.append(resconj)
+        setofprob2=setOfIntProba(np.array(setofdisj))
+        return setofprob2.disjunction()
         
         
     def discountnoncomp(self):
         """return set of discounted probability intervals if they are not compatible
         """
+        min=self.intlist[:,1,:].max(axis=0)
+        max=self.intlist[:,0,:].min(axis=0)
+        epsilon_l=1.
+        epsilon_u=1.
         if self.areCompatible() == 0:
             if min.sum() - 1 > 0:
                 epsilon_l=1./min.sum()
             if max.sum() - 1 < 0:
                 epsilon_u=(1.-self.nbDecision)/(max.sum()-self.nbDecision)
-        discount=min(epsilon_l,epsilon_u)
+        if epsilon_l < epsilon_u:
+            discount=epsilon_l*0.99
+        else:
+            discount=epsilon_u*0.99
         self.intlist[:,1,:]=self.intlist[:,1,:]*discount
         self.intlist[:,0,:]=self.intlist[:,0,:]*discount+(1-discount)
 
@@ -351,4 +436,10 @@ if __name__=='__main__':
     test=setOfIntProba(setproba)
     test.areCompatible()
     test.getalmostMCS()
+    data=Orange.data.Table("audiology")
+    indices = Orange.data.sample.SubsetIndices2(p0=0.25)
+    ind=indices(data)
+    iristr = data.select(ind, 0)
+    iristst = data.select(ind, 1)
+    test_forest(iristr,iristst)
 
