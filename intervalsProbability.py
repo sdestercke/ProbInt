@@ -46,53 +46,6 @@ def getMaxCoherentIntervals(setOfInt):
             ind_up=ind_up+1
     return MCSlist
     
-def test_forest(training,test):
-    """Function that takes a training and test data sets, build forests and return decisions
-    """
-    s=4
-    accuracy=0.
-    set_accuracy=0.
-    disc_accuracy=0.
-    prec=0.
-    nb_classes=len(test.domain.class_var.values)
-    tree_learn = Orange.classification.tree.TreeLearner(minExamples=2, mForPrunning=2, 
-                            sameMajorityPruning=True, name='tree')
-    forest = Orange.ensemble.forest.RandomForestLearner(trees=15, base_learner=tree_learn)
-    single_tree = tree_learn(training)
-    result = forest(training)
-    for j in range(len(test)):
-        setofprob=[]
-        for i in range(len(result.classifiers)):
-            low=np.zeros(nb_classes)
-            up=np.zeros(nb_classes)
-            answer=result.classifiers[i].descender(result.classifiers[i].tree,test[j])
-            divide=sum(answer[0].distribution)+s
-            for k in range(nb_classes):
-                low[k]=(answer[0].distribution[k])/divide
-                up[k]=(answer[0].distribution[k]+s)/divide
-            prob=np.array([up,low])
-            setofprob.append(prob[:])
-        resultingset=setOfIntProba(np.array(setofprob))
-        resultingcomb=resultingset.mostMCSconj()
-        decision=resultingcomb.nc_hurwicz_decision(0.5)        
-        if test[j].getclass()==test.domain.class_var.values[decision]:
-            accuracy=accuracy+1
-        decision_max=resultingcomb.nc_maximal_decision()  
-        true_class=np.zeros(nb_classes)
-        for k in range(nb_classes):
-            if test[j].getclass()==test.domain.class_var.values[k]:
-                true_class[k]=1
-        if any(np.minimum(decision_max,true_class)==1):
-            set_accuracy=set_accuracy+1
-            disc_accuracy=disc_accuracy+(1./decision_max.sum())
-    accuracy=accuracy/len(test)
-    set_accuracy=set_accuracy/len(test)
-    disc_accuracy=disc_accuracy/len(test)
-    for i in range(len(test)):
-        if single_tree(test[i])==test[i].getclass():
-            prec+=1.
-    prec=prec/len(test)
-    return accuracy, set_accuracy, disc_accuracy, prec
 
 class intervalsProbability:
     """Class of probability intervals: upper and lower prob. bounds on singletons
@@ -388,7 +341,7 @@ class setOfIntProba:
         setofdisj=[]
         for i in range(nbMCS):
             nbsetinMCS[i]=len(list[i])
-        best=np.argsort(nbsetinMCS)
+        best=np.argsort(nbsetinMCS)[::-1]
         if nb > nbMCS:
             nb=nbMCS
         for i in range(nb):
@@ -400,7 +353,45 @@ class setOfIntProba:
             setofdisj.append(resconj)
         setofprob2=setOfIntProba(np.array(setofdisj))
         return setofprob2.disjunction()
+       
         
+    def meanfirstMCSweighted(self,nb):
+        """return the mean of MCS that counts the n sets counting the most objects. 
+        """
+        list=self.getalmostMCS()
+        nbMCS=len(list)
+        nbsetinMCS=np.zeros(nbMCS)
+        setofmean=[]
+        for i in range(nbMCS):
+            nbsetinMCS[i]=len(list[i])
+        best=np.argsort(nbsetinMCS)[::-1]
+        if nb > nbMCS:
+            nb=nbMCS
+        sumMCS=nbsetinMCS[best[range(nb)]].sum()
+        for i in range(nb):
+            setofprob=setOfIntProba(self.intlist[list[best[i]],:,:])
+            if setofprob.areCompatible() == 0:
+                setofprob.discountnoncomp()
+            conj=setofprob.conjunction()
+            resconj=np.array([conj.lproba[0,:],conj.lproba[1,:]])
+            if i==0:
+                resconjweighted=(nbsetinMCS[best[i]]/sumMCS)*resconj
+            else:
+                resconjweighted+=(nbsetinMCS[best[i]]/sumMCS)*resconj
+        return intervalsProbability(resconjweighted)
+    
+    def runCombination(self, combname, n=5):
+        resultingcomb=[];
+        if combname=="mostMCSconj":
+            resultingcomb=self.mostMCSconj()
+        if combname=="almostMCScomb":
+            resultingcomb=self.almostMCScomb()
+        if combname=="bestfirstMCS":
+            resultingcomb=self.bestfirstMCS(n)
+        if combname=="meanfirstMCSweighted":
+            resultingcomb=self.meanfirstMCSweighted(n)
+        return resultingcomb
+
         
     def discountnoncomp(self):
         """return set of discounted probability intervals if they are not compatible
@@ -422,24 +413,25 @@ class setOfIntProba:
         self.intlist[:,0,:]=self.intlist[:,0,:]*discount+(1-discount)
 
 if __name__=='__main__':
-    lproba =np.array([[0.4,0.4,0.5],[0.2,0,0.2]])
-    essai=intervalsProbability(lproba)
-    print essai.isProper()
-    print essai.getUpperProbability(np.array([1,1,1]))
-    essai.printProbability()
-    essai.setReachableProbability()
-    print essai.getUpperProbability(np.array([1,0,1]))
-    essai.printProbability()
+    #lproba =np.array([[0.4,0.4,0.5],[0.2,0,0.2]])
+    #essai=intervalsProbability(lproba)
+    #print essai.isProper()
+    #print essai.getUpperProbability(np.array([1,1,1]))
+    #essai.printProbability()
+    #essai.setReachableProbability()
+    #print essai.getUpperProbability(np.array([1,0,1]))
+    #essai.printProbability()
     
-    setproba=np.array([[[0.6,0.5,0.2],[0.4,0.3,0.]],[[0.55,0.55,0.2],[0.35,0.35,0.]],
-                    [[0.5,0.2,0.6],[0.3,0.,0.4]],[[0.35,0.6,0.35],[0.15,0.4,0.15]]])
-    test=setOfIntProba(setproba)
-    test.areCompatible()
-    test.getalmostMCS()
-    data=Orange.data.Table("audiology")
-    indices = Orange.data.sample.SubsetIndices2(p0=0.25)
+    #setproba=np.array([[[0.6,0.5,0.2],[0.4,0.3,0.]],[[0.55,0.55,0.2],[0.35,0.35,0.]],
+    #                [[0.5,0.2,0.6],[0.3,0.,0.4]],[[0.35,0.6,0.35],[0.15,0.4,0.15]]])
+    #test=setOfIntProba(setproba)
+    #test.areCompatible()
+    #test.getalmostMCS()
+   
+    data=Orange.data.Table("audiology") # data.domain, len(data)=> nb instance, len(data.domain)=> nb attribut
+    indices = Orange.data.sample.SubsetIndices2(p0=0.25) # 
     ind=indices(data)
-    iristr = data.select(ind, 0)
-    iristst = data.select(ind, 1)
+    iristr = data.select(ind, 0) # ind=>vect de bool de taille du nb d'instance, 0=> prendre tous les indices
+    iristst = data.select(ind, 1) # 1=> prendre l'inverse des indices
     test_forest(iristr,iristst)
 
